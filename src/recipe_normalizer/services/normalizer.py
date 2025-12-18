@@ -128,11 +128,37 @@ class RecipeNormalizer:
         return [recipe.model_dump_clean() for recipe in recipes]
 
     @staticmethod
-    def _write_json(data: list[dict[str, Any]], output_path: Path) -> None:
+    def _format_recipe_json(data: list[dict[str, Any]]) -> str:
+        """Format recipes as JSON with compact ingredients.
+
+        Ingredients are formatted on single lines while the rest
+        of the structure uses expanded formatting with tabs.
+        """
+        lines = ["["]
+        for i, recipe in enumerate(data):
+            lines.append("\t{")
+            lines.append(f'\t\t"name": {json.dumps(recipe["name"])},')
+            lines.append('\t\t"ingredients": [')
+            for j, ing in enumerate(recipe["ingredients"]):
+                comma = "," if j < len(recipe["ingredients"]) - 1 else ""
+                lines.append(f"\t\t\t{json.dumps(ing, ensure_ascii=False)}{comma}")
+            lines.append("\t\t],")
+            lines.append('\t\t"preparations": [')
+            for j, prep in enumerate(recipe["preparations"]):
+                comma = "," if j < len(recipe["preparations"]) - 1 else ""
+                lines.append(f"\t\t\t{json.dumps(prep, ensure_ascii=False)}{comma}")
+            lines.append("\t\t]")
+            comma = "," if i < len(data) - 1 else ""
+            lines.append("\t}" + comma)
+        lines.append("]")
+        return "\n".join(lines)
+
+    def _write_json(self, data: list[dict[str, Any]], output_path: Path) -> None:
         """Write data to JSON file."""
         try:
+            formatted = self._format_recipe_json(data)
             with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent="\t", ensure_ascii=False)
+                f.write(formatted)
             logger.info("Output written to: %s", output_path)
         except PermissionError as e:
             raise FileWriteError(str(output_path), "Permission denied") from e
