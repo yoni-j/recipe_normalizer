@@ -1,0 +1,14 @@
+---
+name: rice
+ingredients:
+- item: rice
+  quantity: 0.44
+  unit: pound
+- item: oil
+  quantity: 2.02
+  unit: fl. oz.
+- item: onion
+  quantity: 1
+  comment: white or red
+preparations:
+- omitted for brevity
