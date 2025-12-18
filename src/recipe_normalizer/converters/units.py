@@ -70,7 +70,8 @@ class UnitConverter:
         except pint.errors.UndefinedUnitError:
             return False
 
-    def _format_output_unit(self, unit: str) -> str:
+    @staticmethod
+    def _format_output_unit(unit: str) -> str:
         """Format output unit name for consistency."""
         unit_map = {
             "milliliter": "ml",
@@ -126,7 +127,8 @@ class UnitConverter:
         target_unit = self._format_output_unit(str(converted.units))
         return ConversionResult(quantity=float(converted.magnitude), unit=target_unit)
 
-    def round_quantity(self, quantity: float) -> float | int:
+    @staticmethod
+    def round_quantity(quantity: float) -> float | int:
         """Round quantity using cooking-friendly precision rules.
 
         For quantities >= 10, rounds to nearest integer.

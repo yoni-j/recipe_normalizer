@@ -49,7 +49,8 @@ class YamlRecipeParser(RecipeParser):
         except PydanticValidationError as e:
             raise ValidationError("recipe", str(e)) from e
 
-    def _parse_name(self, data: dict[str, Any], file_path: Path) -> str:
+    @staticmethod
+    def _parse_name(data: dict[str, Any], file_path: Path) -> str:
         """Extract recipe name from YAML data."""
         name = data.get("name")
         if not name:
@@ -92,7 +93,8 @@ class YamlRecipeParser(RecipeParser):
             comment=self._parse_comment(data),
         )
 
-    def _parse_quantity(self, data: dict[str, Any]) -> float | None:
+    @staticmethod
+    def _parse_quantity(data: dict[str, Any]) -> float | None:
         """Parse quantity from ingredient data."""
         quantity = data.get("quantity")
         if quantity is None:
@@ -102,7 +104,8 @@ class YamlRecipeParser(RecipeParser):
         except (ValueError, TypeError):
             return None
 
-    def _parse_unit(self, data: dict[str, Any]) -> str | None:
+    @staticmethod
+    def _parse_unit(data: dict[str, Any]) -> str | None:
         """Parse unit from ingredient data."""
         unit = data.get("unit")
         if unit is None:
@@ -110,14 +113,16 @@ class YamlRecipeParser(RecipeParser):
         unit_str = str(unit).strip()
         return unit_str if unit_str else None
 
-    def _parse_comment(self, data: dict[str, Any]) -> str | None:
+    @staticmethod
+    def _parse_comment(data: dict[str, Any]) -> str | None:
         """Parse comment from ingredient data."""
         comment = data.get("comment")
         if comment is None:
             return None
         return str(comment).strip()
 
-    def _parse_preparations(self, data: dict[str, Any]) -> list[str]:
+    @staticmethod
+    def _parse_preparations(data: dict[str, Any]) -> list[str]:
         """Extract preparation steps from YAML data."""
         preparations_data = data.get("preparations", [])
         if not isinstance(preparations_data, list):

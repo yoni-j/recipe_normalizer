@@ -46,7 +46,8 @@ class XmlRecipeParser(RecipeParser):
         except PydanticValidationError as e:
             raise ValidationError("recipe", str(e)) from e
 
-    def _parse_name(self, root: ET.Element, file_path: Path) -> str:
+    @staticmethod
+    def _parse_name(root: ET.Element, file_path: Path) -> str:
         """Extract recipe name from XML."""
         name_elem = root.find("name")
         if name_elem is None or name_elem.text is None:
@@ -80,7 +81,8 @@ class XmlRecipeParser(RecipeParser):
 
         return Ingredient(item=item, quantity=quantity, unit=unit, comment=comment)
 
-    def _parse_quantity(self, elem: ET.Element) -> float | None:
+    @staticmethod
+    def _parse_quantity(elem: ET.Element) -> float | None:
         """Parse quantity from ingredient element."""
         qty_elem = elem.find("quantity")
         if qty_elem is None or qty_elem.text is None:
@@ -90,7 +92,8 @@ class XmlRecipeParser(RecipeParser):
         except ValueError:
             return None
 
-    def _parse_unit(self, elem: ET.Element) -> str | None:
+    @staticmethod
+    def _parse_unit(elem: ET.Element) -> str | None:
         """Parse unit from ingredient element."""
         unit_elem = elem.find("unit")
         if unit_elem is None or unit_elem.text is None:
@@ -98,14 +101,16 @@ class XmlRecipeParser(RecipeParser):
         unit_text = unit_elem.text.strip()
         return unit_text if unit_text else None
 
-    def _parse_comment(self, elem: ET.Element) -> str | None:
+    @staticmethod
+    def _parse_comment(elem: ET.Element) -> str | None:
         """Parse comment from ingredient element."""
         comment_elem = elem.find("comment")
         if comment_elem is None or comment_elem.text is None:
             return None
         return comment_elem.text.strip()
 
-    def _parse_preparations(self, root: ET.Element) -> list[str]:
+    @staticmethod
+    def _parse_preparations(root: ET.Element) -> list[str]:
         """Extract preparation steps from XML."""
         preparations: list[str] = []
 
