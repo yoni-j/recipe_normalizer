@@ -1,9 +1,10 @@
 """XML parser for recipe files."""
 
 import logging
-import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 
+import xmltodict
 from pydantic import ValidationError as PydanticValidationError
 
 from recipe_normalizer.exceptions import FileReadError, ParseError, ValidationError
@@ -25,21 +26,12 @@ class XmlRecipeParser(RecipeParser):
     def parse(self, file_path: Path) -> Recipe:
         """Parse an XML recipe file."""
         logger.debug("Parsing XML file: %s", file_path)
+        data = self._load_xml(file_path)
 
         try:
-            tree = ET.parse(file_path)
-        except FileNotFoundError as e:
-            raise FileReadError(str(file_path), "File not found") from e
-        except PermissionError as e:
-            raise FileReadError(str(file_path), "Permission denied") from e
-        except ET.ParseError as e:
-            raise ParseError(str(file_path), f"Invalid XML: {e}") from e
-
-        root = tree.getroot()
-
-        try:
+            root = data.get("root", {})
             name = self._parse_name(root, file_path)
-            ingredients = self._parse_ingredients(root, file_path)
+            ingredients = self._parse_ingredients(root)
             preparations = self._parse_preparations(root)
 
             return Recipe(name=name, ingredients=ingredients, preparations=preparations)
@@ -47,75 +39,95 @@ class XmlRecipeParser(RecipeParser):
             raise ValidationError("recipe", str(e)) from e
 
     @staticmethod
-    def _parse_name(root: ET.Element, file_path: Path) -> str:
-        """Extract recipe name from XML."""
-        name_elem = root.find("name")
-        if name_elem is None or name_elem.text is None:
+    def _load_xml(file_path: Path) -> dict[str, Any]:
+        """Load and parse XML file to dict."""
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                return xmltodict.parse(f.read())
+        except FileNotFoundError as e:
+            raise FileReadError(str(file_path), "File not found") from e
+        except PermissionError as e:
+            raise FileReadError(str(file_path), "Permission denied") from e
+        except Exception as e:
+            raise ParseError(str(file_path), f"Invalid XML: {e}") from e
+
+    @staticmethod
+    def _parse_name(data: dict[str, Any], file_path: Path) -> str:
+        """Extract recipe name from XML data."""
+        name = data.get("name")
+        if not name:
             raise ParseError(str(file_path), "Recipe name is required")
-        return name_elem.text.strip()
+        return str(name).strip()
 
-    def _parse_ingredients(self, root: ET.Element, file_path: Path) -> list[Ingredient]:
-        """Extract ingredients list from XML."""
+    def _parse_ingredients(self, data: dict[str, Any]) -> list[Ingredient]:
+        """Extract ingredients list from XML data."""
+        ingredients_data = data.get("ingredients", [])
+        # xmltodict returns a single dict if only one element, or list if multiple
+        if isinstance(ingredients_data, dict):
+            ingredients_data = [ingredients_data]
+        if not isinstance(ingredients_data, list):
+            return []
+
         ingredients: list[Ingredient] = []
-
-        for ing_elem in root.findall("ingredients"):
-            ingredient = self._parse_single_ingredient(ing_elem, file_path)
+        for ing_data in ingredients_data:
+            ingredient = self._parse_single_ingredient(ing_data)
             if ingredient:
                 ingredients.append(ingredient)
 
         return ingredients
 
-    def _parse_single_ingredient(
-        self, elem: ET.Element, file_path: Path
-    ) -> Ingredient | None:
-        """Parse a single ingredient element."""
-        item_elem = elem.find("item")
-        if item_elem is None or item_elem.text is None:
-            logger.warning("Skipping ingredient without item in %s", file_path)
+    def _parse_single_ingredient(self, data: dict[str, Any]) -> Ingredient | None:
+        """Parse a single ingredient from dictionary data."""
+        if not isinstance(data, dict):
             return None
 
-        item = item_elem.text.strip()
-        quantity = self._parse_quantity(elem)
-        unit = self._parse_unit(elem)
-        comment = self._parse_comment(elem)
+        item = data.get("item")
+        if not item:
+            return None
 
-        return Ingredient(item=item, quantity=quantity, unit=unit, comment=comment)
+        return Ingredient(
+            item=str(item).strip(),
+            quantity=self._parse_quantity(data),
+            unit=self._parse_unit(data),
+            comment=self._parse_comment(data),
+        )
 
     @staticmethod
-    def _parse_quantity(elem: ET.Element) -> float | None:
-        """Parse quantity from ingredient element."""
-        qty_elem = elem.find("quantity")
-        if qty_elem is None or qty_elem.text is None:
+    def _parse_quantity(data: dict[str, Any]) -> float | None:
+        """Parse quantity from ingredient data."""
+        quantity = data.get("quantity")
+        if quantity is None:
             return None
         try:
-            return float(qty_elem.text.strip())
-        except ValueError:
+            return float(quantity)
+        except (ValueError, TypeError):
             return None
 
     @staticmethod
-    def _parse_unit(elem: ET.Element) -> str | None:
-        """Parse unit from ingredient element."""
-        unit_elem = elem.find("unit")
-        if unit_elem is None or unit_elem.text is None:
+    def _parse_unit(data: dict[str, Any]) -> str | None:
+        """Parse unit from ingredient data."""
+        unit = data.get("unit")
+        if unit is None:
             return None
-        unit_text = unit_elem.text.strip()
-        return unit_text if unit_text else None
+        unit_str = str(unit).strip()
+        return unit_str if unit_str else None
 
     @staticmethod
-    def _parse_comment(elem: ET.Element) -> str | None:
-        """Parse comment from ingredient element."""
-        comment_elem = elem.find("comment")
-        if comment_elem is None or comment_elem.text is None:
+    def _parse_comment(data: dict[str, Any]) -> str | None:
+        """Parse comment from ingredient data."""
+        comment = data.get("comment")
+        if comment is None:
             return None
-        return comment_elem.text.strip()
+        return str(comment).strip()
 
     @staticmethod
-    def _parse_preparations(root: ET.Element) -> list[str]:
-        """Extract preparation steps from XML."""
-        preparations: list[str] = []
+    def _parse_preparations(data: dict[str, Any]) -> list[str]:
+        """Extract preparation steps from XML data."""
+        preparations_data = data.get("preparations", [])
+        # xmltodict returns a single string if only one element, or list if multiple
+        if isinstance(preparations_data, str):
+            return [preparations_data.strip()] if preparations_data.strip() else []
+        if not isinstance(preparations_data, list):
+            return []
 
-        for prep_elem in root.findall("preparations"):
-            if prep_elem.text:
-                preparations.append(prep_elem.text.strip())
-
-        return preparations
+        return [str(prep).strip() for prep in preparations_data if prep]
